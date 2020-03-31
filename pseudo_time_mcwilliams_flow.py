@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 from dedalus import public as de
 from dedalus.extras import plot_tools
 
+import logging
+logger = logging.getLogger(__name__)
+
 from mcwilliams_preconditioner import solve_mcwilliams_preconditioner_problem
 
 n = 32
@@ -60,7 +63,28 @@ preconditioner = solve_mcwilliams_preconditioner_problem(n=n, h=h, lx=lx, ly=ly,
 solver.state['ψ']['g'] = preconditioner.state['ψ']['g']
 solver.state['ψz']['g'] = preconditioner.state['ψz']['g']
 
-dt = 1e-6
+dt = 1e-1 * 1 / n**2
+nt = 1 * n**2
 
-for i in range(10):
+plt.figure()
+ax = plt.gca()
+
+for i in range(nt):
     solver.step(dt)
+
+    if (solver.iteration-1) % 10 == 0:
+        logger.info('Iteration: %i, Time: %e, dt: %e' %(solver.iteration, solver.sim_time, dt))
+
+        # Plot solution
+        ψ = solver.state['ψ']
+        ψ.require_grid_space()
+        plt.cla()
+        plot_tools.plot_bot_3d(ψ, "z", n-1, axes=ax)
+
+        plt.pause(0.1)
+
+# Plot solution
+ψ = solver.state['ψ']
+ψ.require_grid_space()
+plot_tools.plot_bot_3d(ψ, "z", n-1)
+plt.savefig('surface_mcwilliams_flow.png')
