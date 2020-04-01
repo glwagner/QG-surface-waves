@@ -12,13 +12,14 @@ def solve_mcwilliams_preconditioner_problem(
         lx = 1/2,
         ly = 1/4,
          f = 1,
-         n = 32,
+        nx = 32,
+        nz = 32,
         ):
 
     # Create bases and domain
-    x_basis = de.Fourier('x', n, interval=(-np.pi, np.pi))
-    y_basis = de.Fourier('y', n, interval=(-np.pi, np.pi))
-    z_basis = de.Chebyshev('z', n, interval=(-1, 0))
+    x_basis = de.Fourier('x', nx, interval=(-np.pi, np.pi))
+    y_basis = de.Fourier('y', nx, interval=(-np.pi, np.pi))
+    z_basis = de.Chebyshev('z', nz, interval=(-1, 0))
     domain = de.Domain([x_basis, y_basis, z_basis], grid_dtype=np.float64)
 
     # Poisson equation
@@ -34,7 +35,7 @@ def solve_mcwilliams_preconditioner_problem(
     problem.substitutions['uSy'] = "- y * US / ly**2 * exp(z/h - x**2 / (2 * lx**2) - y**2 / (2 * ly**2))"
     problem.substitutions['uSz'] = "US / h * exp(z/h - x**2 / (2 * lx**2) - y**2 / (2 * ly**2))"
 
-    problem.add_equation("dx(dx(ψ)) + dy(dy(ψ)) + f**2 / N**2 * dz(ψz) = uSy",
+    problem.add_equation("dx(dx(ψ)) + dy(dy(ψ)) + f**2 / N**2 * dz(ψz) = -uSy",
                          condition="(nx != 0) or (ny != 0)")
 
     problem.add_equation("ψ = 0", condition="(nx == 0) and (ny == 0)")

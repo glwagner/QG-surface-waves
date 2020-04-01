@@ -10,20 +10,6 @@ logger = logging.getLogger(__name__)
 
 from mcwilliams_preconditioner import solve_mcwilliams_preconditioner_problem
 
-n = 32
-h = 0.1
-lx = 1/2
-ly = 1/4
-f = 1
-
-# Create bases and domain
-x_basis = de.Fourier('x', n, interval=(-np.pi, np.pi))
-y_basis = de.Fourier('y', n, interval=(-np.pi, np.pi))
-z_basis = de.Chebyshev('z', n, interval=(-1, 0))
-domain = de.Domain([x_basis, y_basis, z_basis], grid_dtype=np.float64)
-
-problem = de.IVP(domain, variables=['ψ', 'ψz'])
-
 # We want
 #
 # (f L / N H) = 1 
@@ -34,57 +20,101 @@ problem = de.IVP(domain, variables=['ψ', 'ψz'])
 #
 # US / f * L = 1
 
+nx = 64
+nz = 16
+
+lx = 1/4
+ly = 1/8
+f = 1
+h = 0.1
+
+preconditioner = solve_mcwilliams_preconditioner_problem(nx=nx, nz=nz, h=h, lx=lx, ly=ly, f=f)
+domain = preconditioner.domain
+problem = de.IVP(domain, variables=['ψ', 'ψz'])
+
 problem.parameters['h'] = h
 problem.parameters['lx'] = lx
 problem.parameters['ly'] = ly
 problem.parameters['f'] = f
 problem.parameters['N'] = h / (f * lx)
-problem.parameters['US'] = f * lx
+problem.parameters['US'] = 0.5 * f * lx
 
-problem.substitutions['uS'] = "US * exp(z/h - x**2 / (2 * lx**2) - y**2 / (2 * ly**2))"
-problem.substitutions['uSy'] = "- y * US / ly**2 * exp(z/h - x**2 / (2 * lx**2) - y**2 / (2 * ly**2))"
-problem.substitutions['uSz'] = "US / h * exp(z/h - x**2 / (2 * lx**2) - y**2 / (2 * ly**2))"
+problem.substitutions['uS'] = "               US * exp(z/h - x**2 / (2 * lx**2) - y**2 / (2 * ly**2))"
+problem.substitutions['uSy'] = "- y / ly**2 * US * exp(z/h - x**2 / (2 * lx**2) - y**2 / (2 * ly**2))"
+problem.substitutions['uSz'] = "  1 / h     * US * exp(z/h - x**2 / (2 * lx**2) - y**2 / (2 * ly**2))"
 
-problem.add_equation("dt(ψ) - dx(dx(ψ)) - dy(dy(ψ)) - f**2 / N**2 * dz(ψz) = - f * uS / (N**2 * h) * dy(ψz) - f * uS / (N**2 * h**2) * dy(ψ) - uSy",
-                     condition="(nx != 0) or (ny != 0)")
+problem.add_equation(
+        "dt(ψ) - dx(dx(ψ)) - dy(dy(ψ)) - f**2 / N**2 * dz(ψz) = f * uSz / N**2 * (dy(ψz) + dy(ψ) / h) + uSy",
+        condition="(nx != 0) or (ny != 0)")
 
 problem.add_equation("ψ = 0", condition="(nx == 0) and (ny == 0)")
 problem.add_equation("ψz = 0", condition="(nx == 0) and (ny == 0)")
 problem.add_equation("dz(ψ) - ψz = 0", condition="(nx != 0) or (ny != 0)")
 
-problem.add_bc("left(ψz) = 0", condition="(nx != 0) or (ny != 0)")
 problem.add_bc("right(f * ψz) = right(uSz * dy(ψ))", condition="(nx != 0) or (ny != 0)")
+problem.add_bc("left(ψz) = 0", condition="(nx != 0) or (ny != 0)")
 
 # Build solver
-solver = problem.build_solver(de.timesteppers.RK443)
-
-preconditioner = solve_mcwilliams_preconditioner_problem(n=n, h=h, lx=lx, ly=ly, f=f)
+solver = problem.build_solver(de.timesteppers.SBDF3)
 
 solver.state['ψ']['g'] = preconditioner.state['ψ']['g']
 solver.state['ψz']['g'] = preconditioner.state['ψz']['g']
 
-dt = 1e-1 * 1 / n**2
-nt = 1 * n**2
+ψ = solver.state['ψ']
+ψ.require_grid_space()
+ψ0 = ψ['g'].copy()
+dψ = np.inf
 
-plt.figure()
-ax = plt.gca()
+u_op = - de.operators.differentiate(ψ, y=1)
+v_op =   de.operators.differentiate(ψ, x=1)
 
-for i in range(nt):
+dt = 1e-2 * 1 / max(nx, nz)**2
+
+analysis = solver.evaluator.add_file_handler('mcwilliams_flow', sim_dt=1000*dt)
+analysis.add_task('ψ')
+analysis.add_task('-dy(ψ)')
+analysis.add_task('dx(ψ)')
+
+scale = 4
+
+fig, axs = plt.subplots(ncols=3, figsize=(24, 8))
+
+for i in range(1000):
     solver.step(dt)
 
     if (solver.iteration-1) % 10 == 0:
-        logger.info('Iteration: %i, Time: %e, dt: %e' %(solver.iteration, solver.sim_time, dt))
 
         # Plot solution
         ψ = solver.state['ψ']
         ψ.require_grid_space()
+
+        u = u_op.evaluate()
+        u.set_scales(scale)
+        u.require_grid_space()
+
+        v = v_op.evaluate()
+        v.set_scales(scale)
+        v.require_grid_space()
+
+        plt.sca(axs[0]) 
         plt.cla()
-        plot_tools.plot_bot_3d(ψ, "z", n-1, axes=ax)
+        plot_tools.plot_bot_3d(u, "z", scale*nz-1, axes=axs[0], even_scale=True)
+
+        plt.sca(axs[1]) 
+        plt.cla()
+        plot_tools.plot_bot_3d(v, "z", scale*nz-1, axes=axs[1], even_scale=True)
+
+        plt.sca(axs[2]) 
+        plt.cla()
+        plot_tools.plot_bot_3d(u, "y", int(scale*nx/2), axes=axs[2], even_scale=True)
 
         plt.pause(0.1)
 
-# Plot solution
-ψ = solver.state['ψ']
-ψ.require_grid_space()
-plot_tools.plot_bot_3d(ψ, "z", n-1)
-plt.savefig('surface_mcwilliams_flow.png')
+        # Save solution
+        plt.savefig('mcwilliams_flow.png', dpi=480)
+
+        # Compute change
+        dψ = np.sum(np.abs(ψ0 - ψ['g'])) / np.sum(np.abs(ψ['g']))
+        ψ0 = ψ['g'].copy()
+
+        logger.info('Iteration: %i, Time: %e, dt: %e, dψ: %e' %(solver.iteration, solver.sim_time, dt, dψ))
