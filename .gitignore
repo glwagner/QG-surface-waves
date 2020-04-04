@@ -1,3 +1,7 @@
 *.swp
 __pycache__
-*.ipynb
+.ipynb*
+figs
+*.h5
+mcwilliams_flow
+*.DS_Store
