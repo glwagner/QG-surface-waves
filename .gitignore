@@ -5,3 +5,5 @@ figs
 *.h5
 mcwilliams_flow
 *.DS_Store
+*.nc
+*.png
