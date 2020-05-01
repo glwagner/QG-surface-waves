@@ -58,7 +58,7 @@ end
 function free_surface!(splash, t)
     pebble, tank, grid = splash.pebble, splash.tank, splash.grid
     g, h = tank.g, tank.h
-    @. splash.ŝ = pebble.Π̂ + cos(σ(grid.k, g, h) * t) * pebble.Π̂
+    @. splash.ŝ = -pebble.Π̂ + cos(σ(grid.k, g, h) * t) * pebble.Π̂
 
     mul!(splash.s, grid.irfftplan, splash.ŝ)
 
