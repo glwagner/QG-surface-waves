@@ -73,16 +73,16 @@ splash = Splash(grid, tank, pebble)
 free_surface!(splash, 0)
 
 close("all")
-fig, axs = subplots()
+fig, axs = subplots(figsize=(10, 3))
 
 s₀ = deepcopy(splash.s)
 
 dt = 0.1
-for i = 1:1000
+for i = 1:450
     free_surface!(splash, i * dt)
     cla()
-    #plot(grid.x, s₀, "k--")
+    # plot(grid.x, s₀, "k--")
     plot(grid.x, splash.s, linestyle="-", color="xkcd:indigo", alpha=0.6)
     ylim(-0.5, 1.0)
-    pause(0.1)
+    pause(0.05)
 end
