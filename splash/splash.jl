@@ -58,7 +58,7 @@ end
 function free_surface!(splash, t)
     pebble, tank, grid = splash.pebble, splash.tank, splash.grid
     g, h = tank.g, tank.h
-    @. splash.ŝ = pebble.Π̂ + cos(σ(grid.k, g, h) * t) * pebble.Π̂
+    @. splash.ŝ = -pebble.Π̂ + cos(σ(grid.k, g, h) * t) * pebble.Π̂
 
     mul!(splash.s, grid.irfftplan, splash.ŝ)
 
@@ -73,7 +73,7 @@ splash = Splash(grid, tank, pebble)
 free_surface!(splash, 0)
 
 close("all")
-fig, axs = subplots(figsize=(10, 3))
+fig, axs = subplots(figsize=(10, 2.5))
 
 s₀ = deepcopy(splash.s)
 
@@ -83,6 +83,6 @@ for i = 1:450
     cla()
     # plot(grid.x, s₀, "k--")
     plot(grid.x, splash.s, linestyle="-", color="xkcd:indigo", alpha=0.6)
-    ylim(-0.5, 1.0)
-    pause(0.05)
+    ylim(-1.0, 0.5)
+    pause(0.01)
 end
