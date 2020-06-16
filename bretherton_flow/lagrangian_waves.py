@@ -16,8 +16,8 @@ L = 40
 
 σ = np.sqrt(g * k * np.tanh(k * h))
 
-a_basis = de.Fourier('a',    128, interval=(-L/4, L))
-b_basis = de.Chebyshev('b',   32, interval=(-h, 0))
+a_basis = de.Fourier('a',   128, interval = (-L/4, L))
+b_basis = de.Chebyshev('b',  32, interval = (  -h, 0))
 
 domain = de.Domain([a_basis, b_basis], grid_dtype=np.complex128)
 
@@ -51,8 +51,8 @@ problem.add_equation("dt(yw) - vw = 0")
 problem.add_equation("da(xw) + 1j * k * xw + db(yw) = 0")
 
 ## Momentum conservation
-problem.add_equation("dt(uw) - 1j * σ * uw + da(pw) + 1j * k * pw = 0")
-problem.add_equation("dt(vw) - 1j * σ * vw + db(pw) + g * db(yw)  = 0")
+problem.add_equation("dt(uw) - 1j * σ * uw + g * da(yw) + 1j * k * yw + da(pw) + 1j * k * pw = 0")
+problem.add_equation("dt(vw) - 1j * σ * vw - g * da(xw) + db(pw) = 0")
 
 problem.add_bc("left(yw) = 0")
 problem.add_bc("right(pw) = 0 * g * ep * exp(-a**2 / 2) * exp(- σ * t / 10)")
@@ -90,7 +90,7 @@ u['g'] = σ * y['g']
 v['g'] = - σ * x['g']
 
 solver.stop_iteration = 100000
-dt = 0.001 * 2 * np.pi / σ
+dt = 0.01 * 2 * np.pi / σ
 
 iters_per_period = int(np.round((2 * np.pi / σ) / dt))
 
